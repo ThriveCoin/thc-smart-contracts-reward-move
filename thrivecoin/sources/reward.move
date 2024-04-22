@@ -5,12 +5,16 @@ module thrivecoin::reward {
   use sui::tx_context::{Self, TxContext};
   use sui::vec_set::{Self, VecSet};
   use sui::table::{Self, Table};
+  use sui::sui::SUI;
+  use sui::coin::{Self, Coin};
+  use sui::balance::{Self, Balance};
   use sui::types;
 
   // errors
   const ENotOneTimeWitness: u64 = 1;
   const ENotWriter: u64 = 2;
-  const EBalInsufficient: u64 = 3;
+  const ETreasuryInsufficient: u64 = 3;
+  const EBalInsufficient: u64 = 4;
 
   // structures
   struct AdminRole has key {
@@ -24,6 +28,7 @@ module thrivecoin::reward {
   
   struct RewardLedger has key, store {
     id: UID,
+    treasury: Balance<SUI>,
     balance: Table<address, u64>
   }
 
@@ -45,6 +50,7 @@ module thrivecoin::reward {
 
     transfer::share_object(RewardLedger {
       id: object::new(ctx),
+      treasury: balance::zero(),
       balance: table::new<address, u64>(ctx)
     });
   }
@@ -65,6 +71,15 @@ module thrivecoin::reward {
   public fun writer_list(self: &WriterRole): VecSet<address> { self.list }
 
   // reward functions
+  public fun deposit (
+    reward_ledger: &mut RewardLedger,
+    payment: &mut Coin<SUI>
+  ) {
+    let coin_balance = coin::balance_mut(payment);
+    let paid = balance::withdraw_all(coin_balance);
+    balance::join(&mut reward_ledger.treasury, paid);
+  }
+
   public fun add_reward (
     writer_role: &WriterRole,
     reward_ledger: &mut RewardLedger,
@@ -81,19 +96,26 @@ module thrivecoin::reward {
     *balance = *balance + amount;
   }
 
+  #[allow(lint(self_transfer))]
   public fun claim_reward (
     reward_ledger: &mut RewardLedger,
     amount: u64,
     ctx: &mut TxContext
   ) {
     let recipient = tx_context::sender(ctx);
+    assert!(amount <= balance::value(&reward_ledger.treasury), ETreasuryInsufficient);
+
     assert!(table::contains(&reward_ledger.balance, recipient), EBalInsufficient);
     let balance = table::borrow_mut(&mut reward_ledger.balance, recipient);
     assert!(amount <= *balance, EBalInsufficient);
+
     *balance = *balance - amount;
     if (*balance == 0) {
       table::remove(&mut reward_ledger.balance, recipient);
     };
+
+    let withdrawal = coin::take(&mut reward_ledger.treasury, amount, ctx);
+    transfer::public_transfer(withdrawal, recipient);
   }
 
   public fun get_balance(self: &RewardLedger, recipient: address): u64 {
@@ -106,6 +128,10 @@ module thrivecoin::reward {
 
   public fun has_balance(self: &RewardLedger, recipient: address): bool {
     return table::contains(&self.balance, recipient)
+  }
+
+  public fun treasury_balance(self: &RewardLedger): u64 {
+    return balance::value(&self.treasury)
   }
 
   #[test_only]

@@ -2,6 +2,7 @@
 module thrivecoin::reward_test {
   use thrivecoin::reward::{
     ENotWriter,
+    ETreasuryInsufficient,
     EBalInsufficient,
     AdminRole,
     WriterRole,
@@ -10,13 +11,18 @@ module thrivecoin::reward_test {
     add_writer,
     del_writer,
     writer_list,
+    deposit,
     add_reward,
     claim_reward,
     get_balance,
     has_balance,
+    treasury_balance,
     test_init
   };
+  use sui::transfer;
   use sui::test_scenario as ts;
+  use sui::sui::SUI;
+  use sui::coin::{Self, Coin};
   use sui::vec_set::{Self};
   use std::vector;
 
@@ -164,6 +170,84 @@ module thrivecoin::reward_test {
       assert!(vec_set::contains(&writer_list(&writer), &writer_acc) == false, 1);
 
       ts::return_shared(writer);
+    };
+
+    ts::end(ts);
+  }
+
+  #[test]
+  fun test_deposit () {
+    let ts = ts::begin(@0x0);
+    let rnd_addr: address = @0xAD2;
+    
+    {
+      ts::next_tx(&mut ts, ADMIN);
+      test_init(ts::ctx(&mut ts));
+    };
+
+    {
+      ts::next_tx(&mut ts, ADMIN);
+      let coin = coin::mint_for_testing<SUI>(100, ts::ctx(&mut ts));
+      transfer::public_transfer(coin, ADMIN);
+    };
+
+    {
+      ts::next_tx(&mut ts, ADMIN);
+      let reward_ledger: RewardLedger = ts::take_shared(&ts);
+      assert!(treasury_balance(&reward_ledger) == 0, 1);
+      ts::return_shared(reward_ledger);
+    };
+
+    {
+      ts::next_tx(&mut ts, ADMIN);
+      let reward_ledger: RewardLedger = ts::take_shared(&ts);
+      let coin: Coin<SUI> = ts::take_from_sender(&ts);
+
+      deposit(&mut reward_ledger, &mut coin);
+
+      ts::return_to_sender(&ts, coin);
+      ts::return_shared(reward_ledger);
+    };
+
+    {
+      ts::next_tx(&mut ts, ADMIN);
+      let coin: Coin<SUI> = ts::take_from_sender(&ts);
+      let reward_ledger: RewardLedger = ts::take_shared(&ts);
+
+      assert!(treasury_balance(&reward_ledger) == 100, 1);
+      assert!(coin::value(&coin) == 0, 1);
+
+      ts::return_to_sender(&ts, coin);
+      ts::return_shared(reward_ledger);
+    };
+
+    {
+      ts::next_tx(&mut ts, rnd_addr);
+      let coin = coin::mint_for_testing<SUI>(5, ts::ctx(&mut ts));
+      transfer::public_transfer(coin, rnd_addr);
+    };
+
+    {
+      ts::next_tx(&mut ts, rnd_addr);
+      let reward_ledger: RewardLedger = ts::take_shared(&ts);
+      let coin: Coin<SUI> = ts::take_from_sender(&ts);
+
+      deposit(&mut reward_ledger, &mut coin);
+
+      ts::return_to_sender(&ts, coin);
+      ts::return_shared(reward_ledger);
+    };
+
+    {
+      ts::next_tx(&mut ts, rnd_addr);
+      let coin: Coin<SUI> = ts::take_from_sender(&ts);
+      let reward_ledger: RewardLedger = ts::take_shared(&ts);
+
+      assert!(treasury_balance(&reward_ledger) == 105, 1);
+      assert!(coin::value(&coin) == 0, 1);
+
+      ts::return_to_sender(&ts, coin);
+      ts::return_shared(reward_ledger);
     };
 
     ts::end(ts);
@@ -358,14 +442,77 @@ module thrivecoin::reward_test {
   }
 
   #[test]
-  #[expected_failure(abort_code = EBalInsufficient)]
-  fun test_claim_reward_fail_empty () {
+  #[expected_failure(abort_code = ETreasuryInsufficient)]
+  fun test_claim_reward_treasury_insufficient () {
     let ts = ts::begin(@0x0);
     let recipient: address = @0xAD2;
 
     {
       ts::next_tx(&mut ts, ADMIN);
       test_init(ts::ctx(&mut ts));
+    };
+
+    {
+      ts::next_tx(&mut ts, ADMIN);
+      let writer: WriterRole = ts::take_shared(&ts);
+      let reward_ledger: RewardLedger = ts::take_shared(&ts);
+
+      add_reward(&writer, &mut reward_ledger, recipient, 5, ts::ctx(&mut ts));
+
+      ts::return_shared(writer);
+      ts::return_shared(reward_ledger);
+    };
+
+    {
+      ts::next_tx(&mut ts, ADMIN);
+      let reward_ledger: RewardLedger = ts::take_shared(&ts);
+
+      assert!(get_balance(&reward_ledger, recipient) == 5, 1);
+      assert!(has_balance(&reward_ledger, recipient) == true, 1);
+
+      ts::return_shared(reward_ledger);
+    };
+
+    {
+      ts::next_tx(&mut ts, recipient);
+      let writer: WriterRole = ts::take_shared(&ts);
+      let reward_ledger: RewardLedger = ts::take_shared(&ts);
+
+      claim_reward(&mut reward_ledger, 11, ts::ctx(&mut ts));
+
+      ts::return_shared(writer);
+      ts::return_shared(reward_ledger);
+    };
+
+    ts::end(ts);
+  }
+
+  #[test]
+  #[expected_failure(abort_code = EBalInsufficient)]
+  fun test_claim_reward_fail_bal_empty () {
+    let ts = ts::begin(@0x0);
+    let recipient: address = @0xAD2;
+
+    {
+      ts::next_tx(&mut ts, ADMIN);
+      test_init(ts::ctx(&mut ts));
+    };
+
+    {
+      ts::next_tx(&mut ts, ADMIN);
+      let coin = coin::mint_for_testing<SUI>(100, ts::ctx(&mut ts));
+      transfer::public_transfer(coin, ADMIN);
+    };
+
+    {
+      ts::next_tx(&mut ts, ADMIN);
+      let reward_ledger: RewardLedger = ts::take_shared(&ts);
+      let coin: Coin<SUI> = ts::take_from_sender(&ts);
+
+      deposit(&mut reward_ledger, &mut coin);
+
+      ts::return_to_sender(&ts, coin);
+      ts::return_shared(reward_ledger);
     };
 
     {
@@ -385,13 +532,30 @@ module thrivecoin::reward_test {
 
   #[test]
   #[expected_failure(abort_code = EBalInsufficient)]
-  fun test_claim_reward_insufficient () {
+  fun test_claim_reward_fail_bal_insufficient () {
     let ts = ts::begin(@0x0);
     let recipient: address = @0xAD2;
 
     {
       ts::next_tx(&mut ts, ADMIN);
       test_init(ts::ctx(&mut ts));
+    };
+
+    {
+      ts::next_tx(&mut ts, ADMIN);
+      let coin = coin::mint_for_testing<SUI>(100, ts::ctx(&mut ts));
+      transfer::public_transfer(coin, ADMIN);
+    };
+
+    {
+      ts::next_tx(&mut ts, ADMIN);
+      let reward_ledger: RewardLedger = ts::take_shared(&ts);
+      let coin: Coin<SUI> = ts::take_from_sender(&ts);
+
+      deposit(&mut reward_ledger, &mut coin);
+
+      ts::return_to_sender(&ts, coin);
+      ts::return_shared(reward_ledger);
     };
 
     {
@@ -441,6 +605,23 @@ module thrivecoin::reward_test {
 
     {
       ts::next_tx(&mut ts, ADMIN);
+      let coin = coin::mint_for_testing<SUI>(100, ts::ctx(&mut ts));
+      transfer::public_transfer(coin, ADMIN);
+    };
+
+    {
+      ts::next_tx(&mut ts, ADMIN);
+      let reward_ledger: RewardLedger = ts::take_shared(&ts);
+      let coin: Coin<SUI> = ts::take_from_sender(&ts);
+
+      deposit(&mut reward_ledger, &mut coin);
+
+      ts::return_to_sender(&ts, coin);
+      ts::return_shared(reward_ledger);
+    };
+
+    {
+      ts::next_tx(&mut ts, ADMIN);
       let writer: WriterRole = ts::take_shared(&ts);
       let reward_ledger: RewardLedger = ts::take_shared(&ts);
 
@@ -456,6 +637,7 @@ module thrivecoin::reward_test {
 
       assert!(get_balance(&reward_ledger, recipient) == 13, 1);
       assert!(has_balance(&reward_ledger, recipient) == true, 1);
+      assert!(treasury_balance(&reward_ledger) == 100, 1);
 
       ts::return_shared(reward_ledger);
     };
@@ -472,12 +654,16 @@ module thrivecoin::reward_test {
     };
 
     {
-      ts::next_tx(&mut ts, ADMIN);
+      ts::next_tx(&mut ts, recipient);
+      let coin: Coin<SUI> = ts::take_from_sender(&ts);
       let reward_ledger: RewardLedger = ts::take_shared(&ts);
 
       assert!(get_balance(&reward_ledger, recipient) == 2, 1);
       assert!(has_balance(&reward_ledger, recipient) == true, 1);
+      assert!(treasury_balance(&reward_ledger) == 89, 1);
+      assert!(coin::value(&coin) == 11, 1);
 
+      ts::return_to_sender(&ts, coin);
       ts::return_shared(reward_ledger);
     };
 
@@ -496,6 +682,23 @@ module thrivecoin::reward_test {
 
     {
       ts::next_tx(&mut ts, ADMIN);
+      let coin = coin::mint_for_testing<SUI>(100, ts::ctx(&mut ts));
+      transfer::public_transfer(coin, ADMIN);
+    };
+
+    {
+      ts::next_tx(&mut ts, ADMIN);
+      let reward_ledger: RewardLedger = ts::take_shared(&ts);
+      let coin: Coin<SUI> = ts::take_from_sender(&ts);
+
+      deposit(&mut reward_ledger, &mut coin);
+
+      ts::return_to_sender(&ts, coin);
+      ts::return_shared(reward_ledger);
+    };
+
+    {
+      ts::next_tx(&mut ts, ADMIN);
       let writer: WriterRole = ts::take_shared(&ts);
       let reward_ledger: RewardLedger = ts::take_shared(&ts);
 
@@ -511,6 +714,7 @@ module thrivecoin::reward_test {
 
       assert!(get_balance(&reward_ledger, recipient) == 13, 1);
       assert!(has_balance(&reward_ledger, recipient) == true, 1);
+      assert!(treasury_balance(&reward_ledger) == 100, 1);
 
       ts::return_shared(reward_ledger);
     };
@@ -527,12 +731,16 @@ module thrivecoin::reward_test {
     };
 
     {
-      ts::next_tx(&mut ts, ADMIN);
+      ts::next_tx(&mut ts, recipient);
+      let coin: Coin<SUI> = ts::take_from_sender(&ts);
       let reward_ledger: RewardLedger = ts::take_shared(&ts);
 
       assert!(get_balance(&reward_ledger, recipient) == 0, 1);
       assert!(has_balance(&reward_ledger, recipient) == false, 1);
+      assert!(treasury_balance(&reward_ledger) == 87, 1);
+      assert!(coin::value(&coin) == 13, 1);
 
+      ts::return_to_sender(&ts, coin);
       ts::return_shared(reward_ledger);
     };
 
