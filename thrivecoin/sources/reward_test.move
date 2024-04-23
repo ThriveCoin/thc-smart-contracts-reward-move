@@ -14,9 +14,11 @@ module thrivecoin::reward_test {
     deposit,
     add_reward,
     claim_reward,
+    withdraw_treasury,
     get_balance,
     has_balance,
     treasury_balance,
+    total_rewards,
     test_init
   };
   use sui::transfer;
@@ -321,6 +323,7 @@ module thrivecoin::reward_test {
 
       assert!(get_balance(&reward_ledger, recipient) == 13, 1);
       assert!(has_balance(&reward_ledger, recipient) == true, 1);
+      assert!(total_rewards(&reward_ledger) == 13, 1);
 
       ts::return_shared(reward_ledger);
     };
@@ -356,6 +359,7 @@ module thrivecoin::reward_test {
 
       assert!(get_balance(&reward_ledger, recipient) == 13, 1);
       assert!(has_balance(&reward_ledger, recipient) == true, 1);
+      assert!(total_rewards(&reward_ledger) == 13, 1);
 
       ts::return_shared(reward_ledger);
     };
@@ -377,6 +381,68 @@ module thrivecoin::reward_test {
 
       assert!(get_balance(&reward_ledger, recipient) == 18, 1);
       assert!(has_balance(&reward_ledger, recipient) == true, 1);
+      assert!(total_rewards(&reward_ledger) == 18, 1);
+
+      ts::return_shared(reward_ledger);
+    };
+
+    ts::end(ts);
+  }
+
+  #[test]
+  fun test_multiple_balances () {
+    let ts = ts::begin(@0x0);
+    let recipient1: address = @0xAD2;
+    let recipient2: address = @0xAD3;
+
+    {
+      ts::next_tx(&mut ts, ADMIN);
+      test_init(ts::ctx(&mut ts));
+    };
+
+    {
+      ts::next_tx(&mut ts, ADMIN);
+      let writer: WriterRole = ts::take_shared(&ts);
+      let reward_ledger: RewardLedger = ts::take_shared(&ts);
+
+      assert!(has_balance(&reward_ledger, recipient1) == false, 1);
+      add_reward(&writer, &mut reward_ledger, recipient1, 13, ts::ctx(&mut ts));
+
+      ts::return_shared(writer);
+      ts::return_shared(reward_ledger);
+    };
+
+    {
+      ts::next_tx(&mut ts, ADMIN);
+      let reward_ledger: RewardLedger = ts::take_shared(&ts);
+
+      assert!(get_balance(&reward_ledger, recipient1) == 13, 1);
+      assert!(has_balance(&reward_ledger, recipient1) == true, 1);
+      assert!(total_rewards(&reward_ledger) == 13, 1);
+
+      ts::return_shared(reward_ledger);
+    };
+
+    {
+      ts::next_tx(&mut ts, ADMIN);
+      let writer: WriterRole = ts::take_shared(&ts);
+      let reward_ledger: RewardLedger = ts::take_shared(&ts);
+
+      add_reward(&writer, &mut reward_ledger, recipient2, 5, ts::ctx(&mut ts));
+
+      ts::return_shared(writer);
+      ts::return_shared(reward_ledger);
+    };
+
+    {
+      ts::next_tx(&mut ts, ADMIN);
+      let reward_ledger: RewardLedger = ts::take_shared(&ts);
+
+      assert!(get_balance(&reward_ledger, recipient1) == 13, 1);
+      assert!(has_balance(&reward_ledger, recipient1) == true, 1);
+      assert!(get_balance(&reward_ledger, recipient2) == 5, 1);
+      assert!(has_balance(&reward_ledger, recipient2) == true, 1);
+      assert!(total_rewards(&reward_ledger) == 18, 1);
 
       ts::return_shared(reward_ledger);
     };
@@ -638,6 +704,7 @@ module thrivecoin::reward_test {
       assert!(get_balance(&reward_ledger, recipient) == 13, 1);
       assert!(has_balance(&reward_ledger, recipient) == true, 1);
       assert!(treasury_balance(&reward_ledger) == 100, 1);
+      assert!(total_rewards(&reward_ledger) == 13, 1);
 
       ts::return_shared(reward_ledger);
     };
@@ -661,6 +728,7 @@ module thrivecoin::reward_test {
       assert!(get_balance(&reward_ledger, recipient) == 2, 1);
       assert!(has_balance(&reward_ledger, recipient) == true, 1);
       assert!(treasury_balance(&reward_ledger) == 89, 1);
+      assert!(total_rewards(&reward_ledger) == 2, 1);
       assert!(coin::value(&coin) == 11, 1);
 
       ts::return_to_sender(&ts, coin);
@@ -715,6 +783,7 @@ module thrivecoin::reward_test {
       assert!(get_balance(&reward_ledger, recipient) == 13, 1);
       assert!(has_balance(&reward_ledger, recipient) == true, 1);
       assert!(treasury_balance(&reward_ledger) == 100, 1);
+      assert!(total_rewards(&reward_ledger) == 13, 1);
 
       ts::return_shared(reward_ledger);
     };
@@ -738,7 +807,359 @@ module thrivecoin::reward_test {
       assert!(get_balance(&reward_ledger, recipient) == 0, 1);
       assert!(has_balance(&reward_ledger, recipient) == false, 1);
       assert!(treasury_balance(&reward_ledger) == 87, 1);
+      assert!(total_rewards(&reward_ledger) == 0, 1);
       assert!(coin::value(&coin) == 13, 1);
+
+      ts::return_to_sender(&ts, coin);
+      ts::return_shared(reward_ledger);
+    };
+
+    ts::end(ts);
+  }
+
+  #[test]
+  #[expected_failure(abort_code = ETreasuryInsufficient)]
+  fun test_withdraw_treasury_lt_total_rewards () {
+    let ts = ts::begin(@0x0);
+    let recipient: address = @0xAD2;
+    let wd_recipient: address = @0xAD3;
+
+    {
+      ts::next_tx(&mut ts, ADMIN);
+      test_init(ts::ctx(&mut ts));
+    };
+
+    {
+      ts::next_tx(&mut ts, ADMIN);
+      let coin = coin::mint_for_testing<SUI>(5, ts::ctx(&mut ts));
+      transfer::public_transfer(coin, ADMIN);
+    };
+
+    {
+      ts::next_tx(&mut ts, ADMIN);
+      let reward_ledger: RewardLedger = ts::take_shared(&ts);
+      let coin: Coin<SUI> = ts::take_from_sender(&ts);
+
+      deposit(&mut reward_ledger, &mut coin);
+
+      ts::return_to_sender(&ts, coin);
+      ts::return_shared(reward_ledger);
+    };
+
+    {
+      ts::next_tx(&mut ts, ADMIN);
+      let writer: WriterRole = ts::take_shared(&ts);
+      let reward_ledger: RewardLedger = ts::take_shared(&ts);
+
+      add_reward(&writer, &mut reward_ledger, recipient, 13, ts::ctx(&mut ts));
+
+      ts::return_shared(writer);
+      ts::return_shared(reward_ledger);
+    };
+
+    {
+      ts::next_tx(&mut ts, ADMIN);
+      let reward_ledger: RewardLedger = ts::take_shared(&ts);
+
+      assert!(get_balance(&reward_ledger, recipient) == 13, 1);
+      assert!(has_balance(&reward_ledger, recipient) == true, 1);
+      assert!(treasury_balance(&reward_ledger) == 5, 1);
+
+      ts::return_shared(reward_ledger);
+    };
+
+    {
+      ts::next_tx(&mut ts, ADMIN);
+      let admin: AdminRole = ts::take_from_sender(&ts);
+      let reward_ledger: RewardLedger = ts::take_shared(&ts);
+
+      withdraw_treasury(&admin, &mut reward_ledger, wd_recipient, 1, ts::ctx(&mut ts));
+
+      ts::return_to_sender(&ts, admin);
+      ts::return_shared(reward_ledger);
+    };
+
+    ts::end(ts);
+  }
+
+  #[test]
+  #[expected_failure(abort_code = ETreasuryInsufficient)]
+  fun test_withdraw_treasury_eq_total_rewards () {
+    let ts = ts::begin(@0x0);
+    let recipient: address = @0xAD2;
+    let wd_recipient: address = @0xAD3;
+
+    {
+      ts::next_tx(&mut ts, ADMIN);
+      test_init(ts::ctx(&mut ts));
+    };
+
+    {
+      ts::next_tx(&mut ts, ADMIN);
+      let coin = coin::mint_for_testing<SUI>(13, ts::ctx(&mut ts));
+      transfer::public_transfer(coin, ADMIN);
+    };
+
+    {
+      ts::next_tx(&mut ts, ADMIN);
+      let reward_ledger: RewardLedger = ts::take_shared(&ts);
+      let coin: Coin<SUI> = ts::take_from_sender(&ts);
+
+      deposit(&mut reward_ledger, &mut coin);
+
+      ts::return_to_sender(&ts, coin);
+      ts::return_shared(reward_ledger);
+    };
+
+    {
+      ts::next_tx(&mut ts, ADMIN);
+      let writer: WriterRole = ts::take_shared(&ts);
+      let reward_ledger: RewardLedger = ts::take_shared(&ts);
+
+      add_reward(&writer, &mut reward_ledger, recipient, 13, ts::ctx(&mut ts));
+
+      ts::return_shared(writer);
+      ts::return_shared(reward_ledger);
+    };
+
+    {
+      ts::next_tx(&mut ts, ADMIN);
+      let reward_ledger: RewardLedger = ts::take_shared(&ts);
+
+      assert!(get_balance(&reward_ledger, recipient) == 13, 1);
+      assert!(has_balance(&reward_ledger, recipient) == true, 1);
+      assert!(treasury_balance(&reward_ledger) == 13, 1);
+
+      ts::return_shared(reward_ledger);
+    };
+
+    {
+      ts::next_tx(&mut ts, ADMIN);
+      let admin: AdminRole = ts::take_from_sender(&ts);
+      let reward_ledger: RewardLedger = ts::take_shared(&ts);
+
+      withdraw_treasury(&admin, &mut reward_ledger, wd_recipient, 1, ts::ctx(&mut ts));
+
+      ts::return_to_sender(&ts, admin);
+      ts::return_shared(reward_ledger);
+    };
+
+    ts::end(ts);
+  }
+
+  #[test]
+  #[expected_failure(abort_code = ETreasuryInsufficient)]
+  fun test_withdraw_treasury_amount_exceeds () {
+    let ts = ts::begin(@0x0);
+    let recipient: address = @0xAD2;
+    let wd_recipient: address = @0xAD3;
+
+    {
+      ts::next_tx(&mut ts, ADMIN);
+      test_init(ts::ctx(&mut ts));
+    };
+
+    {
+      ts::next_tx(&mut ts, ADMIN);
+      let coin = coin::mint_for_testing<SUI>(14, ts::ctx(&mut ts));
+      transfer::public_transfer(coin, ADMIN);
+    };
+
+    {
+      ts::next_tx(&mut ts, ADMIN);
+      let reward_ledger: RewardLedger = ts::take_shared(&ts);
+      let coin: Coin<SUI> = ts::take_from_sender(&ts);
+
+      deposit(&mut reward_ledger, &mut coin);
+
+      ts::return_to_sender(&ts, coin);
+      ts::return_shared(reward_ledger);
+    };
+
+    {
+      ts::next_tx(&mut ts, ADMIN);
+      let writer: WriterRole = ts::take_shared(&ts);
+      let reward_ledger: RewardLedger = ts::take_shared(&ts);
+
+      add_reward(&writer, &mut reward_ledger, recipient, 13, ts::ctx(&mut ts));
+
+      ts::return_shared(writer);
+      ts::return_shared(reward_ledger);
+    };
+
+    {
+      ts::next_tx(&mut ts, ADMIN);
+      let reward_ledger: RewardLedger = ts::take_shared(&ts);
+
+      assert!(get_balance(&reward_ledger, recipient) == 13, 1);
+      assert!(has_balance(&reward_ledger, recipient) == true, 1);
+      assert!(treasury_balance(&reward_ledger) == 14, 1);
+
+      ts::return_shared(reward_ledger);
+    };
+
+    {
+      ts::next_tx(&mut ts, ADMIN);
+      let admin: AdminRole = ts::take_from_sender(&ts);
+      let reward_ledger: RewardLedger = ts::take_shared(&ts);
+
+      withdraw_treasury(&admin, &mut reward_ledger, wd_recipient, 2, ts::ctx(&mut ts));
+
+      ts::return_to_sender(&ts, admin);
+      ts::return_shared(reward_ledger);
+    };
+
+    ts::end(ts);
+  }
+
+  #[test]
+  fun test_withdraw_treasury_amount_lt () {
+    let ts = ts::begin(@0x0);
+    let recipient: address = @0xAD2;
+    let wd_recipient: address = @0xAD3;
+
+    {
+      ts::next_tx(&mut ts, ADMIN);
+      test_init(ts::ctx(&mut ts));
+    };
+
+    {
+      ts::next_tx(&mut ts, ADMIN);
+      let coin = coin::mint_for_testing<SUI>(20, ts::ctx(&mut ts));
+      transfer::public_transfer(coin, ADMIN);
+    };
+
+    {
+      ts::next_tx(&mut ts, ADMIN);
+      let reward_ledger: RewardLedger = ts::take_shared(&ts);
+      let coin: Coin<SUI> = ts::take_from_sender(&ts);
+
+      deposit(&mut reward_ledger, &mut coin);
+
+      ts::return_to_sender(&ts, coin);
+      ts::return_shared(reward_ledger);
+    };
+
+    {
+      ts::next_tx(&mut ts, ADMIN);
+      let writer: WriterRole = ts::take_shared(&ts);
+      let reward_ledger: RewardLedger = ts::take_shared(&ts);
+
+      add_reward(&writer, &mut reward_ledger, recipient, 13, ts::ctx(&mut ts));
+
+      ts::return_shared(writer);
+      ts::return_shared(reward_ledger);
+    };
+
+    {
+      ts::next_tx(&mut ts, ADMIN);
+      let reward_ledger: RewardLedger = ts::take_shared(&ts);
+
+      assert!(get_balance(&reward_ledger, recipient) == 13, 1);
+      assert!(has_balance(&reward_ledger, recipient) == true, 1);
+      assert!(treasury_balance(&reward_ledger) == 20, 1);
+
+      ts::return_shared(reward_ledger);
+    };
+
+    {
+      ts::next_tx(&mut ts, ADMIN);
+      let admin: AdminRole = ts::take_from_sender(&ts);
+      let reward_ledger: RewardLedger = ts::take_shared(&ts);
+
+      withdraw_treasury(&admin, &mut reward_ledger, wd_recipient, 5, ts::ctx(&mut ts));
+
+      ts::return_to_sender(&ts, admin);
+      ts::return_shared(reward_ledger);
+    };
+
+    {
+      ts::next_tx(&mut ts, wd_recipient);
+      let coin: Coin<SUI> = ts::take_from_sender(&ts);
+      let reward_ledger: RewardLedger = ts::take_shared(&ts);
+
+      assert!(get_balance(&reward_ledger, recipient) == 13, 1);
+      assert!(treasury_balance(&reward_ledger) == 15, 1);
+      assert!(total_rewards(&reward_ledger) == 13, 1);
+      assert!(coin::value(&coin) == 5, 1);
+
+      ts::return_to_sender(&ts, coin);
+      ts::return_shared(reward_ledger);
+    };
+
+    ts::end(ts);
+  }
+
+  #[test]
+  fun test_withdraw_treasury_amount_eq () {
+    let ts = ts::begin(@0x0);
+    let recipient: address = @0xAD2;
+    let wd_recipient: address = @0xAD3;
+
+    {
+      ts::next_tx(&mut ts, ADMIN);
+      test_init(ts::ctx(&mut ts));
+    };
+
+    {
+      ts::next_tx(&mut ts, ADMIN);
+      let coin = coin::mint_for_testing<SUI>(20, ts::ctx(&mut ts));
+      transfer::public_transfer(coin, ADMIN);
+    };
+
+    {
+      ts::next_tx(&mut ts, ADMIN);
+      let reward_ledger: RewardLedger = ts::take_shared(&ts);
+      let coin: Coin<SUI> = ts::take_from_sender(&ts);
+
+      deposit(&mut reward_ledger, &mut coin);
+
+      ts::return_to_sender(&ts, coin);
+      ts::return_shared(reward_ledger);
+    };
+
+    {
+      ts::next_tx(&mut ts, ADMIN);
+      let writer: WriterRole = ts::take_shared(&ts);
+      let reward_ledger: RewardLedger = ts::take_shared(&ts);
+
+      add_reward(&writer, &mut reward_ledger, recipient, 13, ts::ctx(&mut ts));
+
+      ts::return_shared(writer);
+      ts::return_shared(reward_ledger);
+    };
+
+    {
+      ts::next_tx(&mut ts, ADMIN);
+      let reward_ledger: RewardLedger = ts::take_shared(&ts);
+
+      assert!(get_balance(&reward_ledger, recipient) == 13, 1);
+      assert!(has_balance(&reward_ledger, recipient) == true, 1);
+      assert!(treasury_balance(&reward_ledger) == 20, 1);
+
+      ts::return_shared(reward_ledger);
+    };
+
+    {
+      ts::next_tx(&mut ts, ADMIN);
+      let admin: AdminRole = ts::take_from_sender(&ts);
+      let reward_ledger: RewardLedger = ts::take_shared(&ts);
+
+      withdraw_treasury(&admin, &mut reward_ledger, wd_recipient, 7, ts::ctx(&mut ts));
+
+      ts::return_to_sender(&ts, admin);
+      ts::return_shared(reward_ledger);
+    };
+
+    {
+      ts::next_tx(&mut ts, wd_recipient);
+      let coin: Coin<SUI> = ts::take_from_sender(&ts);
+      let reward_ledger: RewardLedger = ts::take_shared(&ts);
+
+      assert!(get_balance(&reward_ledger, recipient) == 13, 1);
+      assert!(treasury_balance(&reward_ledger) == 13, 1);
+      assert!(total_rewards(&reward_ledger) == 13, 1);
+      assert!(coin::value(&coin) == 7, 1);
 
       ts::return_to_sender(&ts, coin);
       ts::return_shared(reward_ledger);

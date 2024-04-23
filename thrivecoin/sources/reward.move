@@ -29,6 +29,7 @@ module thrivecoin::reward {
   struct RewardLedger has key, store {
     id: UID,
     treasury: Balance<SUI>,
+    total_rewards: u64,
     balances: Table<address, u64>
   }
 
@@ -51,6 +52,7 @@ module thrivecoin::reward {
     transfer::share_object(RewardLedger {
       id: object::new(ctx),
       treasury: balance::zero(),
+      total_rewards: 0,
       balances: table::new<address, u64>(ctx)
     });
   }
@@ -94,6 +96,7 @@ module thrivecoin::reward {
 
     let balance = table::borrow_mut(&mut reward_ledger.balances, recipient);
     *balance = *balance + amount;
+    reward_ledger.total_rewards = reward_ledger.total_rewards + amount;
   }
 
   #[allow(lint(self_transfer))]
@@ -110,9 +113,26 @@ module thrivecoin::reward {
     assert!(amount <= *balance, EBalInsufficient);
 
     *balance = *balance - amount;
+    reward_ledger.total_rewards = reward_ledger.total_rewards - amount;
     if (*balance == 0) {
       table::remove(&mut reward_ledger.balances, recipient);
     };
+
+    let withdrawal = coin::take(&mut reward_ledger.treasury, amount, ctx);
+    transfer::public_transfer(withdrawal, recipient);
+  }
+
+  // Allows withdrawing funds that exceed total rewards
+  public fun withdraw_treasury (
+    _: &AdminRole,
+    reward_ledger: &mut RewardLedger,
+    recipient: address,
+    amount: u64,
+    ctx: &mut TxContext
+  ) {
+    let treasury = balance::value(&reward_ledger.treasury);
+    assert!(treasury > reward_ledger.total_rewards, ETreasuryInsufficient);
+    assert!(amount <= treasury - reward_ledger.total_rewards, ETreasuryInsufficient);
 
     let withdrawal = coin::take(&mut reward_ledger.treasury, amount, ctx);
     transfer::public_transfer(withdrawal, recipient);
@@ -132,6 +152,10 @@ module thrivecoin::reward {
 
   public fun treasury_balance(self: &RewardLedger): u64 {
     return balance::value(&self.treasury)
+  }
+
+  public fun total_rewards(self: &RewardLedger): u64 {
+    return self.total_rewards
   }
 
   #[test_only]
