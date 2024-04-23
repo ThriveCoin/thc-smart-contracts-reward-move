@@ -205,7 +205,7 @@ module thrivecoin::reward_test {
       let reward_ledger: RewardLedger = ts::take_shared(&ts);
       let coin: Coin<SUI> = ts::take_from_sender(&ts);
 
-      deposit(&mut reward_ledger, &mut coin);
+      deposit(&mut reward_ledger, &mut coin, 100);
 
       ts::return_to_sender(&ts, coin);
       ts::return_shared(reward_ledger);
@@ -234,7 +234,7 @@ module thrivecoin::reward_test {
       let reward_ledger: RewardLedger = ts::take_shared(&ts);
       let coin: Coin<SUI> = ts::take_from_sender(&ts);
 
-      deposit(&mut reward_ledger, &mut coin);
+      deposit(&mut reward_ledger, &mut coin, 3);
 
       ts::return_to_sender(&ts, coin);
       ts::return_shared(reward_ledger);
@@ -245,8 +245,8 @@ module thrivecoin::reward_test {
       let coin: Coin<SUI> = ts::take_from_sender(&ts);
       let reward_ledger: RewardLedger = ts::take_shared(&ts);
 
-      assert!(treasury_balance(&reward_ledger) == 105, 1);
-      assert!(coin::value(&coin) == 0, 1);
+      assert!(treasury_balance(&reward_ledger) == 103, 1);
+      assert!(coin::value(&coin) == 2, 1);
 
       ts::return_to_sender(&ts, coin);
       ts::return_shared(reward_ledger);
@@ -575,7 +575,7 @@ module thrivecoin::reward_test {
       let reward_ledger: RewardLedger = ts::take_shared(&ts);
       let coin: Coin<SUI> = ts::take_from_sender(&ts);
 
-      deposit(&mut reward_ledger, &mut coin);
+      deposit(&mut reward_ledger, &mut coin, 100);
 
       ts::return_to_sender(&ts, coin);
       ts::return_shared(reward_ledger);
@@ -618,7 +618,7 @@ module thrivecoin::reward_test {
       let reward_ledger: RewardLedger = ts::take_shared(&ts);
       let coin: Coin<SUI> = ts::take_from_sender(&ts);
 
-      deposit(&mut reward_ledger, &mut coin);
+      deposit(&mut reward_ledger, &mut coin, 100);
 
       ts::return_to_sender(&ts, coin);
       ts::return_shared(reward_ledger);
@@ -680,7 +680,7 @@ module thrivecoin::reward_test {
       let reward_ledger: RewardLedger = ts::take_shared(&ts);
       let coin: Coin<SUI> = ts::take_from_sender(&ts);
 
-      deposit(&mut reward_ledger, &mut coin);
+      deposit(&mut reward_ledger, &mut coin, 100);
 
       ts::return_to_sender(&ts, coin);
       ts::return_shared(reward_ledger);
@@ -759,7 +759,7 @@ module thrivecoin::reward_test {
       let reward_ledger: RewardLedger = ts::take_shared(&ts);
       let coin: Coin<SUI> = ts::take_from_sender(&ts);
 
-      deposit(&mut reward_ledger, &mut coin);
+      deposit(&mut reward_ledger, &mut coin, 100);
 
       ts::return_to_sender(&ts, coin);
       ts::return_shared(reward_ledger);
@@ -840,7 +840,7 @@ module thrivecoin::reward_test {
       let reward_ledger: RewardLedger = ts::take_shared(&ts);
       let coin: Coin<SUI> = ts::take_from_sender(&ts);
 
-      deposit(&mut reward_ledger, &mut coin);
+      deposit(&mut reward_ledger, &mut coin, 5);
 
       ts::return_to_sender(&ts, coin);
       ts::return_shared(reward_ledger);
@@ -905,7 +905,7 @@ module thrivecoin::reward_test {
       let reward_ledger: RewardLedger = ts::take_shared(&ts);
       let coin: Coin<SUI> = ts::take_from_sender(&ts);
 
-      deposit(&mut reward_ledger, &mut coin);
+      deposit(&mut reward_ledger, &mut coin, 13);
 
       ts::return_to_sender(&ts, coin);
       ts::return_shared(reward_ledger);
@@ -970,7 +970,7 @@ module thrivecoin::reward_test {
       let reward_ledger: RewardLedger = ts::take_shared(&ts);
       let coin: Coin<SUI> = ts::take_from_sender(&ts);
 
-      deposit(&mut reward_ledger, &mut coin);
+      deposit(&mut reward_ledger, &mut coin, 14);
 
       ts::return_to_sender(&ts, coin);
       ts::return_shared(reward_ledger);
@@ -1034,7 +1034,7 @@ module thrivecoin::reward_test {
       let reward_ledger: RewardLedger = ts::take_shared(&ts);
       let coin: Coin<SUI> = ts::take_from_sender(&ts);
 
-      deposit(&mut reward_ledger, &mut coin);
+      deposit(&mut reward_ledger, &mut coin, 20);
 
       ts::return_to_sender(&ts, coin);
       ts::return_shared(reward_ledger);
@@ -1112,7 +1112,7 @@ module thrivecoin::reward_test {
       let reward_ledger: RewardLedger = ts::take_shared(&ts);
       let coin: Coin<SUI> = ts::take_from_sender(&ts);
 
-      deposit(&mut reward_ledger, &mut coin);
+      deposit(&mut reward_ledger, &mut coin, 20);
 
       ts::return_to_sender(&ts, coin);
       ts::return_shared(reward_ledger);

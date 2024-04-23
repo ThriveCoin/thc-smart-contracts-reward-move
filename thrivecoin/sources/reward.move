@@ -75,11 +75,12 @@ module thrivecoin::reward {
   // reward functions
   public fun deposit (
     reward_ledger: &mut RewardLedger,
-    payment: &mut Coin<SUI>
+    coin: &mut Coin<SUI>,
+    amount: u64
   ) {
-    let coin_balance = coin::balance_mut(payment);
-    let paid = balance::withdraw_all(coin_balance);
-    balance::join(&mut reward_ledger.treasury, paid);
+    let coin_balance = coin::balance_mut(coin);
+    let payment = balance::split(coin_balance, amount);
+    balance::join(&mut reward_ledger.treasury, payment);
   }
 
   public fun add_reward (
