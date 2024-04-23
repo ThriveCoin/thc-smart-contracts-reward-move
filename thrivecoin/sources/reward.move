@@ -29,7 +29,7 @@ module thrivecoin::reward {
   struct RewardLedger has key, store {
     id: UID,
     treasury: Balance<SUI>,
-    balance: Table<address, u64>
+    balances: Table<address, u64>
   }
 
   // OTW
@@ -51,7 +51,7 @@ module thrivecoin::reward {
     transfer::share_object(RewardLedger {
       id: object::new(ctx),
       treasury: balance::zero(),
-      balance: table::new<address, u64>(ctx)
+      balances: table::new<address, u64>(ctx)
     });
   }
 
@@ -88,11 +88,11 @@ module thrivecoin::reward {
     ctx: &mut TxContext
   ) {
     assert!(vec_set::contains(&writer_role.list, &tx_context::sender(ctx)), ENotWriter);
-    if (!table::contains(&reward_ledger.balance, recipient)) {
-      table::add(&mut reward_ledger.balance, recipient, 0);
+    if (!table::contains(&reward_ledger.balances, recipient)) {
+      table::add(&mut reward_ledger.balances, recipient, 0);
     };
 
-    let balance = table::borrow_mut(&mut reward_ledger.balance, recipient);
+    let balance = table::borrow_mut(&mut reward_ledger.balances, recipient);
     *balance = *balance + amount;
   }
 
@@ -105,13 +105,13 @@ module thrivecoin::reward {
     let recipient = tx_context::sender(ctx);
     assert!(amount <= balance::value(&reward_ledger.treasury), ETreasuryInsufficient);
 
-    assert!(table::contains(&reward_ledger.balance, recipient), EBalInsufficient);
-    let balance = table::borrow_mut(&mut reward_ledger.balance, recipient);
+    assert!(table::contains(&reward_ledger.balances, recipient), EBalInsufficient);
+    let balance = table::borrow_mut(&mut reward_ledger.balances, recipient);
     assert!(amount <= *balance, EBalInsufficient);
 
     *balance = *balance - amount;
     if (*balance == 0) {
-      table::remove(&mut reward_ledger.balance, recipient);
+      table::remove(&mut reward_ledger.balances, recipient);
     };
 
     let withdrawal = coin::take(&mut reward_ledger.treasury, amount, ctx);
@@ -119,15 +119,15 @@ module thrivecoin::reward {
   }
 
   public fun get_balance(self: &RewardLedger, recipient: address): u64 {
-    if (!table::contains(&self.balance, recipient)) {
+    if (!table::contains(&self.balances, recipient)) {
       return 0
     };
 
-    return *table::borrow(&self.balance, recipient)
+    return *table::borrow(&self.balances, recipient)
   }
 
   public fun has_balance(self: &RewardLedger, recipient: address): bool {
-    return table::contains(&self.balance, recipient)
+    return table::contains(&self.balances, recipient)
   }
 
   public fun treasury_balance(self: &RewardLedger): u64 {
