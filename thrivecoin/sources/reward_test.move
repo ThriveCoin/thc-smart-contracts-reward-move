@@ -25,6 +25,7 @@ module thrivecoin::reward_test {
   use sui::test_scenario as ts;
   use sui::sui::SUI;
   use sui::coin::{Self, Coin};
+  use sui::balance::{ENotEnough};
   use sui::vec_set::{Self};
   use std::vector;
 
@@ -181,7 +182,7 @@ module thrivecoin::reward_test {
   fun test_deposit () {
     let ts = ts::begin(@0x0);
     let rnd_addr: address = @0xAD2;
-    
+
     {
       ts::next_tx(&mut ts, ADMIN);
       test_init(ts::ctx(&mut ts));
@@ -247,6 +248,44 @@ module thrivecoin::reward_test {
 
       assert!(treasury_balance(&reward_ledger) == 103, 1);
       assert!(coin::value(&coin) == 2, 1);
+
+      ts::return_to_sender(&ts, coin);
+      ts::return_shared(reward_ledger);
+    };
+
+    ts::end(ts);
+  }
+
+  #[test]
+  #[expected_failure(abort_code = ENotEnough)]
+  fun test_deposit_amount_insufficient () {
+    let ts = ts::begin(@0x0);
+    let rnd_addr: address = @0xAD2;
+
+    {
+      ts::next_tx(&mut ts, ADMIN);
+      test_init(ts::ctx(&mut ts));
+    };
+
+    {
+      ts::next_tx(&mut ts, ADMIN);
+      let coin = coin::mint_for_testing<SUI>(100, ts::ctx(&mut ts));
+      transfer::public_transfer(coin, ADMIN);
+    };
+
+    {
+      ts::next_tx(&mut ts, ADMIN);
+      let reward_ledger: RewardLedger = ts::take_shared(&ts);
+      assert!(treasury_balance(&reward_ledger) == 0, 1);
+      ts::return_shared(reward_ledger);
+    };
+
+    {
+      ts::next_tx(&mut ts, ADMIN);
+      let reward_ledger: RewardLedger = ts::take_shared(&ts);
+      let coin: Coin<SUI> = ts::take_from_sender(&ts);
+
+      deposit(&mut reward_ledger, &mut coin, 101);
 
       ts::return_to_sender(&ts, coin);
       ts::return_shared(reward_ledger);
