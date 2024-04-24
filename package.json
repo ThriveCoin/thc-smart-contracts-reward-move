@@ -25,6 +25,7 @@
   "homepage": "https://github.com/ThriveCoin/thc-smart-contracts-reward-move#readme",
   "devDependencies": {
     "@mysten/sui.js": "^0.50.0",
+    "@thrivecoin/web3-utils": "git+https://github.com/ThriveCoin/thc-web3-utils-js#chore/web3-upgrade",
     "bech32": "^2.0.0",
     "standard": "^17.1.0",
     "yargs": "^17.7.2"
