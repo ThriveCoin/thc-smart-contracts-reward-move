@@ -8,13 +8,12 @@ module thrivecoin::reward {
   use sui::sui::SUI;
   use sui::coin::{Self, Coin};
   use sui::balance::{Self, Balance};
-  use sui::types;
 
   // errors
-  const ENotOneTimeWitness: u64 = 1;
-  const ENotWriter: u64 = 2;
-  const ETreasuryInsufficient: u64 = 3;
-  const EBalInsufficient: u64 = 4;
+  const ENotWriter: u64 = 1;
+  const ETreasuryInsufficient: u64 = 2;
+  const EBalInsufficient: u64 = 3;
+  const ERecipientDoesNotExist: u64 = 4;
 
   // structures
   struct AdminRole has key {
@@ -37,9 +36,7 @@ module thrivecoin::reward {
   struct REWARD has drop {}
 
   // initializer
-  fun init(otw: REWARD, ctx: &mut TxContext) {
-    assert!(types::is_one_time_witness(&otw), ENotOneTimeWitness);
-
+  fun init(_otw: REWARD, ctx: &mut TxContext) {
     transfer::transfer(AdminRole {
       id: object::new(ctx)
     }, tx_context::sender(ctx));
@@ -67,6 +64,7 @@ module thrivecoin::reward {
   }
 
   public fun del_writer(_: &AdminRole, writer_role: &mut WriterRole, account: address) {
+    assert!(vec_set::contains(&writer_role.list, &account), ENotWriter);
     vec_set::remove(&mut writer_role.list, &account);
   }
 
@@ -109,7 +107,7 @@ module thrivecoin::reward {
     let recipient = tx_context::sender(ctx);
     assert!(amount <= balance::value(&reward_ledger.treasury), ETreasuryInsufficient);
 
-    assert!(table::contains(&reward_ledger.balances, recipient), EBalInsufficient);
+    assert!(table::contains(&reward_ledger.balances, recipient), ERecipientDoesNotExist);
     let balance = table::borrow_mut(&mut reward_ledger.balances, recipient);
     assert!(amount <= *balance, EBalInsufficient);
 

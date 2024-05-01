@@ -4,6 +4,7 @@ module thrivecoin::reward_test {
     ENotWriter,
     ETreasuryInsufficient,
     EBalInsufficient,
+    ERecipientDoesNotExist,
     AdminRole,
     WriterRole,
     RewardLedger,
@@ -115,6 +116,42 @@ module thrivecoin::reward_test {
       assert!(vec_set::contains(&writer_list(&writer), &admin_ref), 1);
       assert!(vec_set::contains(&writer_list(&writer), &writer_acc), 1);
 
+      ts::return_shared(writer);
+    };
+
+    ts::end(ts);
+  }
+
+  #[test]
+  #[expected_failure(abort_code = ENotWriter)]
+  fun test_del_writer_not_exists () {
+    let ts = ts::begin(@0x0);
+    let writer_acc: address = @0xAD2;
+
+    {
+      ts::next_tx(&mut ts, ADMIN);
+      test_init(ts::ctx(&mut ts));
+    };
+
+    {
+      ts::next_tx(&mut ts, ADMIN);
+      let writer: WriterRole = ts::take_shared(&ts);
+
+      let admin_ref = ADMIN;
+      assert!(vec_set::contains(&writer_list(&writer), &admin_ref), 1);
+      assert!(vec_set::contains(&writer_list(&writer), &writer_acc) == false, 1);
+
+      ts::return_shared(writer);
+    };
+
+    {
+      ts::next_tx(&mut ts, ADMIN);
+      let admin: AdminRole = ts::take_from_sender(&ts);
+      let writer: WriterRole = ts::take_shared(&ts);
+
+      del_writer(&admin, &mut writer, writer_acc);
+
+      ts::return_to_sender(&ts, admin);
       ts::return_shared(writer);
     };
 
@@ -260,7 +297,6 @@ module thrivecoin::reward_test {
   #[expected_failure(abort_code = ENotEnough)]
   fun test_deposit_amount_insufficient () {
     let ts = ts::begin(@0x0);
-    let rnd_addr: address = @0xAD2;
 
     {
       ts::next_tx(&mut ts, ADMIN);
@@ -593,7 +629,7 @@ module thrivecoin::reward_test {
   }
 
   #[test]
-  #[expected_failure(abort_code = EBalInsufficient)]
+  #[expected_failure(abort_code = ERecipientDoesNotExist)]
   fun test_claim_reward_fail_bal_empty () {
     let ts = ts::begin(@0x0);
     let recipient: address = @0xAD2;
