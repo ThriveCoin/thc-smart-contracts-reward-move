@@ -1,3 +1,6 @@
+// Copyright (c) Thrive Protocol.
+// SPDX-License-Identifier: MIT
+
 module thrivecoin::reward {
   // imports
   use sui::object::{Self, UID};
