@@ -58,23 +58,23 @@ module thrivecoin::reward {
   }
 
   // role functions
-  public fun transfer_admin_role (admin_role: AdminRole, new_owner: address) {
+  entry fun transfer_admin_role (admin_role: AdminRole, new_owner: address) {
     transfer::transfer(admin_role, new_owner);
   }
 
-  public fun add_writer (_: &AdminRole, writer_role: &mut WriterRole, account: address) {
+  entry fun add_writer (_: &AdminRole, writer_role: &mut WriterRole, account: address) {
     vec_set::insert(&mut writer_role.list, account);
   }
 
-  public fun del_writer(_: &AdminRole, writer_role: &mut WriterRole, account: address) {
+  entry fun del_writer(_: &AdminRole, writer_role: &mut WriterRole, account: address) {
     assert!(vec_set::contains(&writer_role.list, &account), ENotWriter);
     vec_set::remove(&mut writer_role.list, &account);
   }
 
-  public fun writer_list(self: &WriterRole): VecSet<address> { self.list }
+  entry fun writer_list(self: &WriterRole): VecSet<address> { self.list }
 
   // reward functions
-  public fun deposit (
+  entry fun deposit (
     reward_ledger: &mut RewardLedger,
     coin: &mut Coin<SUI>,
     amount: u64
@@ -84,12 +84,12 @@ module thrivecoin::reward {
     balance::join(&mut reward_ledger.treasury, payment);
   }
 
-  public fun add_reward (
+  entry fun add_reward (
     writer_role: &WriterRole,
     reward_ledger: &mut RewardLedger,
     recipient: address,
     amount: u64,
-    ctx: &mut TxContext
+    ctx: &TxContext
   ) {
     assert!(vec_set::contains(&writer_role.list, &tx_context::sender(ctx)), ENotWriter);
     if (!table::contains(&reward_ledger.balances, recipient)) {
@@ -102,7 +102,7 @@ module thrivecoin::reward {
   }
 
   #[allow(lint(self_transfer))]
-  public fun claim_reward (
+  entry fun claim_reward (
     reward_ledger: &mut RewardLedger,
     amount: u64,
     ctx: &mut TxContext
@@ -125,7 +125,7 @@ module thrivecoin::reward {
   }
 
   // Allows withdrawing funds that exceed total rewards
-  public fun withdraw_treasury (
+  entry fun withdraw_treasury (
     _: &AdminRole,
     reward_ledger: &mut RewardLedger,
     recipient: address,
